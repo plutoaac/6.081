@@ -65,6 +65,7 @@ kfree(void *pa)
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
 // Returns 0 if the memory cannot be allocated.
+// kalloc函数专门负责分配一页未用的物理内存并返回，主要操作就是从空闲链表的头部摘下一个节点并返回。
 void *
 kalloc(void)
 {
@@ -79,4 +80,14 @@ kalloc(void)
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
+}
+uint64 
+get_freemm(){
+  uint64 pagenum=0;
+  struct run *page=kmem.freelist;
+  while(page){
+    pagenum++;
+    page=page->next;
+  }
+  return pagenum*PGSIZE;
 }
