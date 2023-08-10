@@ -75,19 +75,33 @@ sys_sleep(void)
   return 0;
 }
 
+extern pte_t* walk(pagetable_t, uint64, int);
 
-#ifdef LAB_PGTBL
-int
-sys_pgaccess(void)
-{
-  // lab pgtbl: your code here.
+
+uint64 
+sys_pgaccess(void) {
+  uint64 BitMask = 0;
+  uint64 StartVA;
+  int NumberOfPages;
+  uint64 BitMaskVA;
+  if (argint(1, &NumberOfPages) < 0) return -1;
+  if (argaddr(0, &StartVA) < 0) return -1;
+  if (argaddr(2, &BitMaskVA) < 0) return -1;
+  pte_t* pte;
+  for (int i = 0; i < NumberOfPages; StartVA += PGSIZE, ++i) {
+    if ((pte = walk(myproc()->pagetable, StartVA, 1)) == 0)
+      panic("pgaccess : walk failed");
+    if (*pte & PTE_A) {
+      BitMask |= 1 << i;  
+      *pte ^= PTE_A;     
+    }
+  }
+ copyout(myproc()->pagetable, BitMaskVA, (char*)&BitMask, sizeof(BitMask));
   return 0;
 }
-#endif
 
 uint64
-sys_kill(void)
-{
+sys_kill(void) {
   int pid;
 
   if(argint(0, &pid) < 0)
