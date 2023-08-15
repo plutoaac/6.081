@@ -64,12 +64,13 @@ threetest()
     printf("sbrk(%d) failed\n", sz);
     exit(-1);
   }
-
+   //printf("%d\n",222);
   pid1 = fork();
   if(pid1 < 0){
     printf("fork failed\n");
     exit(-1);
   }
+ // printf("%d\n", 333);
   if(pid1 == 0){
     pid2 = fork();
     if(pid2 < 0){
@@ -94,8 +95,10 @@ threetest()
     exit(0);
   }
 
+
   for(char *q = p; q < p + sz; q += 4096){
     *(int*)q = getpid();
+   // printf("%d\n",*(int*)q);
   }
 
   wait(0);
@@ -108,11 +111,12 @@ threetest()
       exit(-1);
     }
   }
-
+ 
   if(sbrk(-sz) == (char*)0xffffffffffffffffL){
     printf("sbrk(-%d) failed\n", sz);
     exit(-1);
   }
+
 
   printf("ok\n");
 }
