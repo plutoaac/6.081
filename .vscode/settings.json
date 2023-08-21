@@ -1,0 +1,24 @@
+{
+    "files.associations": {
+        "buf.h": "c",
+        "mutex": "c",
+        "array": "c",
+        "*.tcc": "c",
+        "chrono": "c",
+        "compare": "c",
+        "unordered_map": "c",
+        "memory": "c",
+        "memory_resource": "c",
+        "type_traits": "c",
+        "random": "c",
+        "functional": "c",
+        "future": "c",
+        "ostream": "c",
+        "ratio": "c",
+        "system_error": "c",
+        "tuple": "c",
+        "utility": "c",
+        "fs.h": "c",
+        "defs.h": "c"
+    }
+}
