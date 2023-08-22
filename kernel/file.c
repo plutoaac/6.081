@@ -167,7 +167,6 @@ filewrite(struct file *f, uint64 addr, int n)
       end_op();
 
       if(r != n1){
-        // error from writei
         break;
       }
       i += r;

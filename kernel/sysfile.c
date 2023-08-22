@@ -15,6 +15,10 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include  "memlayout.h"
+#define max(a, b) ((a) > (b) ? (a) : (b)) 
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#define MMAPMINADDR (TRAPFRAME - 10 * PGSIZE)
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -484,11 +488,126 @@ sys_pipe(void)
   }
   return 0;
 }
-uint64 sys_mmap(void){
 
-  return  0;
+uint64 sys_mmap(void) {
+  uint64 addr;
+  int len, prot, flags, offset;
+  struct file *f;
+  struct vm_area *vma = 0;
+  struct proc *p = myproc();
+  if (argaddr(0, &addr) < 0 || argint(1, &len) < 0 || argint(2, &prot) < 0 ||
+      argint(3, &flags) < 0 || argfd(4, 0, &f) < 0 || argint(5, &offset) < 0) {
+    return -1;
+  }
+  if (flags != MAP_SHARED && flags != MAP_PRIVATE) {
+    return -1;
+  }
+  if (flags == MAP_SHARED && f->writable == 0 && (prot & PROT_WRITE)) {
+    return -1;
+  }
+  if (len < 0 || offset < 0 || offset % PGSIZE) {
+    return -1;
+  }
+  for (int  i = 0; i < NVMA; ++i) {
+    if (!p->vma[i].addr) {
+      vma = &p->vma[i];
+      break;
+    }
+  }
+  if (!vma) {
+    return -1;
+  }
+ addr = MMAPMINADDR;
+  for (int i = 0; i < NVMA; ++i) {
+    if (p->vma[i].addr) {
+      addr = max(addr, p->vma[i].addr + p->vma[i].len);
+    }
+  }
+  addr = PGROUNDUP(addr);
+  if (addr + len > TRAPFRAME) {
+    return -1;
+  }
+  vma->addr = addr;
+  vma->len = len;
+  vma->prot = prot;
+  vma->flags = flags;
+  vma->offset = offset;
+  vma->f = f;
+  filedup(f);  
+  return addr;
 }
-uint64 sys_munmap(void){
 
+uint64 sys_munmap(void) {
+  uint64 addr, va;
+  int len;
+  struct proc *p = myproc();
+  struct vm_area *vma = 0;
+  uint maxsz, n, n1;
+  int i;
+
+  if (argaddr(0, &addr) < 0 || argint(1, &len) < 0) {
+    return -1;
+  }
+  if (addr % PGSIZE || len < 0) {
+    return -1;
+  }
+
+  // find the VMA
+  for (i = 0; i < NVMA; ++i) {
+    if (p->vma[i].addr && addr >= p->vma[i].addr &&
+        addr + len <= p->vma[i].addr + p->vma[i].len) {
+      vma = &p->vma[i];
+      break;
+    }
+  }
+  if (!vma) {
+    return -1;
+  }
+
+  if (len == 0) {
+    return 0;
+  }
+
+  if ((vma->flags & MAP_SHARED)) {
+    // 这里可以仿照filc.c 的 filewrite 去写
+    maxsz = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
+    int tmp=len;
+    for (va = addr; va < addr + len; va += PGSIZE) {
+      if (uvmgetdirty(p->pagetable, va) == 0) {
+        continue;
+      }
+      //n = min(PGSIZE, addr + len - va);
+      if(tmp>PGSIZE){
+        tmp-=PGSIZE;
+        n=PGSIZE;
+      }else{
+        n=tmp;
+      }
+      for (i = 0; i < n; i += n1) {
+        n1 = min(maxsz, n - i);
+        begin_op();
+        ilock(vma->f->ip);
+        if (writei(vma->f->ip, 1, va + i, va - vma->addr + vma->offset + i,
+                   n1) != n1) {
+          iunlock(vma->f->ip);
+          end_op();
+          return -1;
+        }
+        iunlock(vma->f->ip);
+        end_op();
+      }
+    }
+   // filewrite(vma->f,addr,len);
+  }
+  uvmunmap(p->pagetable, addr,  len/ PGSIZE , 1);
+  if (addr == vma->addr && len == vma->len) {
+    vma->addr = 0;
+    vma->len = 0;
+    vma->offset = 0;
+    vma->flags = 0;
+    vma->prot = 0;
+    fileclose(vma->f);
+    vma->f = 0;
+  } 
   return 0;
 }
